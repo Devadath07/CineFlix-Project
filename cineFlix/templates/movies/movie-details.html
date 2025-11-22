@@ -1,0 +1,40 @@
+{% extends 'base.html' %}
+
+{% block section %}
+
+<!-- Hero Section -->
+  <section class="hero-section" style="background:url('{{movie.photo.url}}') center center/cover no-repeat;">
+    <div class="hero-overlay"></div>
+    <div class="hero-content">
+      <h1 class="display-5 fw-bold d-inline-block me-3">{{movie.name}}</h1>
+      <a href="{% url 'movie-edit' movie.uuid %}"><i class="fa fa-solid fa-pen text-white mx-2"></i></a>
+      <a href="{% url 'movie-delete' movie.uuid %}"><i class="fa fa-solid fa-trash text-white mx-2"></i></a>
+      <div class="d-flex align-items-center mb-2">
+        <span class="match me-3">{{movie.runtime | time:'H i'}}</span>
+        <span class="me-3">{{ movie.release_date|date:'Y' }}</span>
+        <span class="badge bg-dark me-3 px-2 py-1">TV-{{ movie.certification }}</span>
+        <span>{{movie.industry.name}}</span>
+      </div>
+      <p class="text-light mb-3">
+        {{movie.description}}
+      </p>
+
+      <div class="d-flex gap-2 mb-3">
+        <button class="btn btn-white text-dark rounded pill" style="width: 150px;"><i class="fa-solid fa-play me-2"></i>Play</button>
+        <button class="btn bg-dark btn-outline-light rounded-pill" style="width: 150px;"><i class="fa-solid fa-plus me-2"></i>My List</button>
+        <button class="btn btn-list"><i class="fa-regular fa-thumbs-up"></i></button>
+        <button class="btn btn-list"><i class="fa-regular fa-thumbs-down"></i></button>
+      </div>
+
+      <!-- <p class="info-text mb-1">
+        <i class="fa-solid fa-trophy me-2"></i>
+        Jessica Lange won two Emmys and a Golden Globe for this series. Lady Gaga won a Golden Globe for her Season 5 role.
+      </p> -->
+
+      <p><strong>Starring:</strong>{% for artist in movie.artists.all %} {{ artist.name }} {% endfor %}</p>
+      <p><strong>Genres:</strong>{% for gen in movie.genre.all %} {{ gen.name }} {% endfor %}</p>
+      <p><strong>Available in: </strong>{% for language in movie.languages.all %} {{ language.name }} {% endfor %}</p>
+    </div>
+  </section>
+
+{% endblock %}
