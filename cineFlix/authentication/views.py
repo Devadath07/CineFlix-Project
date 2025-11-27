@@ -2,13 +2,17 @@ from django.shortcuts import render,redirect
 
 from django.views import View
 
-from .forms import LoginForm,SignUpForm
+from .forms import LoginForm,SignUpForm,AddPhoneForm,OTPForm
 
 from django.contrib.auth import authenticate,login,logout
 
 from django.contrib.auth.hashers import make_password
 
-from cineFlix.utils import generate_password
+from cineFlix.utils import generate_password,generate_otp,send_otp
+
+from .models import OTP
+
+from django.utils import timezone
 
 # Create your views here.
 class LoginView(View):
@@ -100,3 +104,128 @@ class SignUpView(View):
         data = {'form':form}
 
         return render(request,self.template,context=data)
+
+class ProfileView(View):
+
+    template = 'authentication/profile.html'
+
+    def get(self,request,*args, **kwargs):
+
+        return render(request,self.template)
+    
+
+class AddPhoneView(View):
+
+    template = 'authentication/phone.html'
+
+    form_class = AddPhoneForm
+
+    def get(self,request,*args, **kwargs):
+
+        form = self.form_class()
+
+        data = {'form':form}
+
+        return render(request,self.template,context=data)
+    
+
+    def post(self,request,*args, **kwargs):
+
+        form = self.form_class(request.POST)
+
+        if form.is_valid():
+
+            phone = form.cleaned_data.get('phone')
+
+            user = request.user
+
+            user.phone = phone 
+
+            user.save()
+
+
+            return redirect('verify-otp')
+        
+        data = {'form':form}
+
+        return render(request,self.template,context=data)
+
+
+class VerifyOTPView(View):
+
+    template = 'authentication/otp.html'
+
+    form_class = OTPForm
+
+    def get(self,request,*args, **kwargs):
+
+        form = self.form_class()
+
+        otp = generate_otp()
+
+        user = request.user
+
+        phone = user.phone
+
+        otp_obj,created = OTP.objects.get_or_create(profile=user)
+
+        otp_obj.otp = otp
+
+        otp_obj.save()
+
+        send_otp(phone,otp)
+
+        request.session['otp_time'] = timezone.now().timestamp()
+
+        remaining_time = 60
+
+        data = {'form':form,'remaining_time':remaining_time} 
+
+        return render(request,self.template,context=data)
+    
+    def post(self,request,*args, **kwargs):
+
+        form = self.form_class(request.POST)
+
+        if form.is_valid():
+
+            user = request.user
+
+            #reverse_lookup
+
+            db_otp = user.otp.otp
+
+            input_otp = form.cleaned_data.get('otp')
+
+            otp_time = request.session.get('otp_time')  
+
+            current_time = timezone.now().timestamp()
+
+            if otp_time :
+
+                elapsed = current_time - otp_time
+
+                remaining_time = max(0, 300 - int(elapsed))
+
+                if elapsed > 60 :
+
+                    error = 'OTP expired Request a Newone'
+
+                elif db_otp == input_otp :
+                    
+                    request.session.pop('otp_time')
+
+                    user.phone_verified = True
+
+                    user.save()
+
+                    return redirect('profile')
+                
+                else :
+
+                    error = 'Invalid OTP'
+
+        data = {'form':form,'remaining_time':remaining_time,'error':error}
+
+        return render(request,self.template,context=data)
+

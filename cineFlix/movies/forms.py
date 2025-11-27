@@ -55,6 +55,3 @@ class MovieForm(forms.ModelForm):
         if photo and photo.size > 3*1024*1024:  # 3 is mb and it is converted to byte
 
             self.add_error('photo','maximum file size upto 3 MB') # to get error first is field of error, next is what is error
-
-
-
