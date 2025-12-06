@@ -71,6 +71,8 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
             ],
+
+            'builtins':['authentication.role_permissions','movies.custom_tags'] # to access custom template tags to all files
         },
     },
 ]
@@ -141,3 +143,17 @@ MEDIA_ROOT = os.path.join(BASE_DIR,'media')
 #using custom model as user model
 
 AUTH_USER_MODEL = 'authentication.Profile'
+
+#email Integration
+
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+
+EMAIL_HOST = 'smtp.gmail.com'
+
+EMAIL_USE_TLS =True
+
+EMAIL_PORT = 587
+
+EMAIL_HOST_USER = config('EMAIL_HOST_USER')
+
+EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD')

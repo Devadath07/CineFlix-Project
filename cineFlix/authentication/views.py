@@ -2,17 +2,25 @@ from django.shortcuts import render,redirect
 
 from django.views import View
 
-from .forms import LoginForm,SignUpForm,AddPhoneForm,OTPForm
+from .forms import LoginForm,SignUpForm,AddPhoneForm,OTPForm,ChangePasswordForm
 
 from django.contrib.auth import authenticate,login,logout
 
 from django.contrib.auth.hashers import make_password
 
-from cineFlix.utils import generate_password,generate_otp,send_otp
+from cineFlix.utils import generate_password,generate_otp,send_otp,send_email
 
 from .models import OTP
 
 from django.utils import timezone
+
+from django.utils.decorators import method_decorator
+
+from django.contrib.auth.decorators import login_required
+
+import threading
+
+from .permissions import permitted_user_roles
 
 # Create your views here.
 class LoginView(View):
@@ -55,7 +63,7 @@ class LoginView(View):
 
         return render(request,self.template,context=data)
 
-
+@method_decorator(login_required(login_url='login'),name='dispatch') 
 class LogoutView(View):
 
     def get(self,request,*args, **kwargs):
@@ -99,12 +107,27 @@ class SignUpView(View):
 
             user.save()
 
+            recipient = user.email
+
+            template = 'emails/logincredentials.html'
+
+            subject = 'Cineflix : Login Credentials'
+
+            context = {'user':f'{user.first_name} {user.last_name}','username':user.email,'password':password}
+
+            # send_email(recipient,template,subject,context)
+
+            thread = threading.Thread(target=send_email,args=(recipient,template,subject,context))
+
+            thread.start()
+
             return redirect('login')
         
         data = {'form':form}
 
         return render(request,self.template,context=data)
 
+@method_decorator(permitted_user_roles(['User','Admin']),name='dispatch') 
 class ProfileView(View):
 
     template = 'authentication/profile.html'
@@ -113,7 +136,7 @@ class ProfileView(View):
 
         return render(request,self.template)
     
-
+@method_decorator(permitted_user_roles(['User']),name='dispatch')
 class AddPhoneView(View):
 
     template = 'authentication/phone.html'
@@ -150,7 +173,7 @@ class AddPhoneView(View):
 
         return render(request,self.template,context=data)
 
-
+@method_decorator(permitted_user_roles(['User']),name='dispatch')
 class VerifyOTPView(View):
 
     template = 'authentication/otp.html'
@@ -177,9 +200,9 @@ class VerifyOTPView(View):
 
         request.session['otp_time'] = timezone.now().timestamp()
 
-        remaining_time = 60
+        remaining_time = 300
 
-        data = {'form':form,'remaining_time':remaining_time} 
+        data = {'form':form,'remaining_time':remaining_time,'phone':phone} 
 
         return render(request,self.template,context=data)
     
@@ -227,5 +250,138 @@ class VerifyOTPView(View):
 
         data = {'form':form,'remaining_time':remaining_time,'error':error}
 
-        return render(request,self.template,context=data)
+        return render(request,self.template,context=data) 
 
+@method_decorator(permitted_user_roles(['User']),name='dispatch')   
+class ChangePasswordOTPView(View):
+
+    template = 'authentication/password-otp.html'
+
+    form_class = OTPForm
+
+    def get(self,request,*args, **kwargs):
+
+        form = self.form_class()
+
+        otp = generate_otp()
+
+        user = request.user
+
+        otp_obj,created = OTP.objects.get_or_create(profile=user)
+
+        otp_obj.email_otp = otp
+
+        otp_obj.save()
+
+        recipient = user.email
+
+        template = 'emails/password-otp-email.html'
+
+        subject = 'Cineflix : OTP for Change Password'
+
+        context = {'user':f'{user.first_name} {user.last_name}','otp':otp}
+
+        # send_email(recipient,template,subject,context)
+
+        thread = threading.Thread(target=send_email,args=(recipient,template,subject,context))
+
+        thread.start()
+
+        request.session['otp_time'] = timezone.now().timestamp()
+
+        remaining_time = 300
+
+        data = {'form':form,'remaining_time':remaining_time,}
+
+        return render(request,self.template,context=data)
+    
+    def post(self,request,*args,**kwargs):
+
+        form=self.form_class(request.POST)
+
+        if form.is_valid():
+
+            user=request.user
+
+            db_otp=user.otp.email_otp
+
+            input_otp=form.cleaned_data.get('otp')
+
+            otp_time = request.session.get('otp_time')  
+
+            current_time = timezone.now().timestamp()
+
+            if otp_time :
+
+                elapsed = current_time - otp_time
+
+                remaining_time = max(0, 300 - int(elapsed))
+
+                if elapsed > 300 :
+
+                    error = 'OTP expired Request a Newone'
+
+                elif db_otp == input_otp :
+
+                    request.session.pop('otp_time')
+
+                    user.otp.email_otp_verified=True
+
+                    user.otp.save()
+
+                    return redirect('change-password')
+                
+                else :
+
+                    error = 'Invalid OTP'
+
+        data={'form':form,'remaining_time':remaining_time,'error':error}
+
+        return render(request,self.template,context=data)
+    
+
+class ChangePasswordView(View):
+
+    template = 'authentication/change-password.html'
+
+    form_class = ChangePasswordForm
+
+    def get(self,request,*args, **kwargs):
+
+        user = request.user
+
+        if user.otp.email_otp_verified:
+
+            form = self.form_class()
+
+            data = {'form':form} # form passed
+
+            return render(request,self.template,context=data)
+        
+        else:
+
+            return redirect('password-otp')
+    
+    def post(self,request,*args, **kwargs):
+
+        form = self.form_class(request.POST)
+
+        if form.is_valid():
+
+            user = request.user
+
+            password = form.cleaned_data.get('new_password')
+
+            user.password = make_password(password) # for password encryption use make_password --> it hashes the password and set as password
+
+            user.save()  
+
+            user.otp.email_otp_verified = False
+
+            user.otp.save()
+
+            return redirect('login')
+        
+        data = {'form':form}
+
+        return render(request,self.template,context=data)

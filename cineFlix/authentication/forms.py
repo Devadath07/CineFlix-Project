@@ -30,6 +30,18 @@ class SignUpForm(forms.ModelForm):
 
         }
 
+    #not using already used emails
+
+    def clean(self):
+
+        cleaned_data = super().clean()
+
+        email = cleaned_data.get('email')
+
+        if Profile.objects.filter(username=email).exists():
+
+            self.add_error('email','this email already registered')
+
 class AddPhoneForm(forms.Form):
 
     phone = forms.CharField(max_length=14,widget=forms.TextInput(attrs={'class':'form-control'}))
@@ -57,3 +69,26 @@ class AddPhoneForm(forms.Form):
 class OTPForm(forms.Form):
 
     otp = forms.CharField(max_length=4,widget=forms.TextInput(attrs={'class':'form-control'}))
+
+
+class ChangePasswordForm(forms.Form):
+
+    new_password = forms.CharField(widget=forms.PasswordInput(attrs={'class':'form-control'}))
+
+    confirm_password = forms.CharField(widget=forms.PasswordInput(attrs={'class':'form-control'}))
+
+    #to avoid mismatch use clean method
+
+    def clean(self):
+
+        cleaned_data = super().clean()
+
+        new_password = cleaned_data.get('new_password')
+
+        confirm_password = cleaned_data.get('confirm_password')
+
+        if new_password != confirm_password:
+
+            self.add_error('confirm_password','passwords does not match')
+
+

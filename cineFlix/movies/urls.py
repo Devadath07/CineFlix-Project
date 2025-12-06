@@ -12,11 +12,11 @@ urlpatterns = [
 
     # path('movie-details/<int:id>',views.MovieDetailsView.as_view(),name='movie-details'),
 
-    path('movie-details/<str:uuid>',views.MovieDetailsView.as_view(),name='movie-details'),
+    path('movie-details/<str:uuid>/',views.MovieDetailsView.as_view(),name='movie-details'),
 
-    path('movie-edit/<str:uuid>',views.MovieEditView.as_view(),name='movie-edit'),
+    path('movie-edit/<str:uuid>/',views.MovieEditView.as_view(),name='movie-edit'),
 
-    path('movie-delete/<str:uuid>',views.MovieDeleteView.as_view(),name='movie-delete'),
+    path('movie-delete/<str:uuid>/',views.MovieDeleteView.as_view(),name='movie-delete'),
 
 
 
